@@ -1,0 +1,12 @@
+[package]
+name = "amqdo"
+version = "0.1.0"
+authors = ["russell"]
+edition = "2018"
+
+[dependencies]
+config = "0.9.3"
+reqwest = "0.9.17"
+serde = "1.0.92"
+serde_derive = "1.0.92"
+serde_json = "1.0.39"

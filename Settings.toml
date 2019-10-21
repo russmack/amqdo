@@ -1,0 +1,7 @@
+hostname = "localhost"
+brokerport = 8161
+brokername = "localhost"
+username = ""
+password = ""
+listenport = 8166
+
