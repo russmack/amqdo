@@ -3,6 +3,7 @@ extern crate reqwest;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
+extern crate serde_xml_rs;
 
 use std::process;
 
@@ -13,6 +14,9 @@ pub enum ResponseType {
     Version         { response: Option<VersionResponse> },
     Broker          { response: Option<BrokerResponse> },
     HeapMemoryUsage { response: Option<HeapMemoryUsageResponse> },
+    Queues          { response: Option<QueuesResponse> },
+    Topics          { response: Option<TopicsResponse> },
+    Subscribers     { response: Option<SubscribersResponse> },
 }
 
 fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Result<ResponseType, String> {
@@ -55,6 +59,39 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
                 },
             };
             Ok(ResponseType::HeapMemoryUsage { response: Some(res) })
+        },
+        ResponseType::Queues{response: _} => {
+            // TODO xml deserialization.
+            let res: QueuesResponse = match serde_xml_rs::from_str(&buf) {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("failed deserializing json response: {}", e);
+                    process::exit(1);
+                },
+            };
+            Ok(ResponseType::Queues { response: Some(res) })
+        },
+        ResponseType::Topics{response: _} => {
+            // TODO xml deserialization.
+            let res: TopicsResponse = match serde_json::from_str(&buf) {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("failed deserializing json response: {}", e);
+                    process::exit(1);
+                },
+            };
+            Ok(ResponseType::Topics { response: Some(res) })
+        },
+        ResponseType::Subscribers{response: _} => {
+            // TODO xml deserialization.
+            let res: SubscribersResponse = match serde_json::from_str(&buf) {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("failed deserializing json response: {}", e);
+                    process::exit(1);
+                },
+            };
+            Ok(ResponseType::Subscribers { response: Some(res) })
         },
     }
 }
@@ -131,6 +168,38 @@ fn api_get_heap_memory_usage(settings: &config::Config) {
     println!("{:#?}", result);
 }
 
+// TODO implement the following endpoint requests
+/*
+http://localhost:8161/admin/xml/topics.jsp
+http://localhost:8161/admin/xml/subscribers.jsp
+http://localhost:8161/admin/queueBrowse/RTestQ?view=rss&feedType=rss_2.0
+http://localhost:8161/admin/queueBrowse/RTestQ?view=rss&feedType=atom_1.0
+http://localhost:8161/admin/queueBrowse/RTestQ
+*/
+
+fn api_get_queues(settings: &config::Config) {
+    // Queues
+    // Eg. http://localhost:8161/admin/xml/queues.jsp
+    let req = format!("http://{}:{}/{}/{}/{}", 
+                settings.get::<String>("hostname").unwrap(),
+                settings.get::<String>("brokerport").unwrap(),
+                "admin",
+                "xml",
+                "queues.jsp",
+                );
+
+    let result = match send_request(ResponseType::Queues{response: None}, req, &settings) {
+        Ok(v)   => v,
+        Err(e)  => {
+            println!("error: request failed: {}", e);
+            process::exit(1);
+        },
+    };
+
+    println!("Result queues:");
+    println!("{:#?}", result);
+}
+
 fn main() {
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
@@ -140,6 +209,38 @@ fn main() {
     api_get_version(&settings);
 
     api_get_heap_memory_usage(&settings);
+
+    api_get_queues(&settings);
+
+}
+
+// Queues
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueuesResponse {
+    // #[serde(rename = "queue", default)]
+    pub queue: Vec<QueuesQueue>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueuesQueue {
+    pub name: String,
+    pub feed: QueuesQueueFeed,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueuesQueueFeed {
+    pub atom: String,
+    pub rss: String,
+}
+
+// Topics
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TopicsResponse {
+    //
+}
+
+// Subscribers
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubscribersResponse {
+    //
 }
 
 // API Version
