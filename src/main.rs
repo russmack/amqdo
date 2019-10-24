@@ -34,7 +34,7 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
             let res: BrokerResponse = match serde_json::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
-                    println!("failed deserializing json response: {}", e);
+                    println!("failed deserializing broker json response: {}", e);
                     process::exit(1);
                 },
             };
@@ -44,7 +44,7 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
             let res: VersionResponse = match serde_json::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
-                    println!("failed deserializing json response: {}", e);
+                    println!("failed deserializing version json response: {}", e);
                     process::exit(1);
                 },
             };
@@ -54,18 +54,17 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
             let res: HeapMemoryUsageResponse = match serde_json::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
-                    println!("failed deserializing json response: {}", e);
+                    println!("failed deserializing heap memory usage json response: {}", e);
                     process::exit(1);
                 },
             };
             Ok(ResponseType::HeapMemoryUsage { response: Some(res) })
         },
         ResponseType::Queues{response: _} => {
-            // TODO xml deserialization.
             let res: QueuesResponse = match serde_xml_rs::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
-                    println!("failed deserializing json response: {}", e);
+                    println!("failed deserializing queues xml response: {}", e);
                     process::exit(1);
                 },
             };
@@ -73,10 +72,10 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
         },
         ResponseType::Topics{response: _} => {
             // TODO xml deserialization.
-            let res: TopicsResponse = match serde_json::from_str(&buf) {
+            let res: TopicsResponse = match serde_xml_rs::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
-                    println!("failed deserializing json response: {}", e);
+                    println!("failed deserializing topics xml response: {}", e);
                     process::exit(1);
                 },
             };
@@ -84,10 +83,10 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
         },
         ResponseType::Subscribers{response: _} => {
             // TODO xml deserialization.
-            let res: SubscribersResponse = match serde_json::from_str(&buf) {
+            let res: SubscribersResponse = match serde_xml_rs::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
-                    println!("failed deserializing json response: {}", e);
+                    println!("failed deserializing subscribers xml response: {}", e);
                     process::exit(1);
                 },
             };
@@ -200,6 +199,52 @@ fn api_get_queues(settings: &config::Config) {
     println!("{:#?}", result);
 }
 
+fn api_get_topics(settings: &config::Config) {
+    // Topics
+    // Eg. http://localhost:8161/admin/xml/topics.jsp
+    let req = format!("http://{}:{}/{}/{}/{}", 
+                settings.get::<String>("hostname").unwrap(),
+                settings.get::<String>("brokerport").unwrap(),
+                "admin",
+                "xml",
+                "topics.jsp",
+                );
+
+    let result = match send_request(ResponseType::Queues{response: None}, req, &settings) {
+        Ok(v)   => v,
+        Err(e)  => {
+            println!("error: request failed: {}", e);
+            process::exit(1);
+        },
+    };
+
+    println!("Result topics:");
+    println!("{:#?}", result);
+}
+
+fn api_get_subscribers(settings: &config::Config) {
+    // Subscribers
+    // Eg. http://localhost:8161/admin/xml/subscribers.jsp
+    let req = format!("http://{}:{}/{}/{}/{}", 
+                settings.get::<String>("hostname").unwrap(),
+                settings.get::<String>("brokerport").unwrap(),
+                "admin",
+                "xml",
+                "subscribers.jsp",
+                );
+
+    let result = match send_request(ResponseType::Queues{response: None}, req, &settings) {
+        Ok(v)   => v,
+        Err(e)  => {
+            println!("error: request failed: {}", e);
+            process::exit(1);
+        },
+    };
+
+    println!("Result subscribers:");
+    println!("{:#?}", result);
+}
+
 fn main() {
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
@@ -211,19 +256,30 @@ fn main() {
     api_get_heap_memory_usage(&settings);
 
     api_get_queues(&settings);
+    api_get_topics(&settings);
+    api_get_subscribers(&settings);
 
 }
 
 // Queues
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueuesResponse {
-    // #[serde(rename = "queue", default)]
-    pub queue: Vec<QueuesQueue>,
+    #[serde(rename="queue", default)]
+    pub queues: Vec<QueuesQueue>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueuesQueue {
     pub name: String,
+    pub stats: QueuesQueueStats,
     pub feed: QueuesQueueFeed,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct QueuesQueueStats {
+    pub size: usize,
+    pub consumer_count: usize,
+    pub enqueue_count: usize,
+    pub dequeue_count: usize,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueuesQueueFeed {
