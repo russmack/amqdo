@@ -210,7 +210,7 @@ fn api_get_topics(settings: &config::Config) {
                 "topics.jsp",
                 );
 
-    let result = match send_request(ResponseType::Queues{response: None}, req, &settings) {
+    let result = match send_request(ResponseType::Topics{response: None}, req, &settings) {
         Ok(v)   => v,
         Err(e)  => {
             println!("error: request failed: {}", e);
@@ -233,7 +233,7 @@ fn api_get_subscribers(settings: &config::Config) {
                 "subscribers.jsp",
                 );
 
-    let result = match send_request(ResponseType::Queues{response: None}, req, &settings) {
+    let result = match send_request(ResponseType::Subscribers{response: None}, req, &settings) {
         Ok(v)   => v,
         Err(e)  => {
             println!("error: request failed: {}", e);
@@ -290,7 +290,21 @@ pub struct QueuesQueueFeed {
 // Topics
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TopicsResponse {
-    //
+    #[serde(rename="topic", default)]
+    pub topics: Vec<TopicsTopic>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TopicsTopic {
+    pub name: String,
+    pub stats: TopicsTopicStats,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct TopicsTopicStats {
+    pub size: usize,
+    pub consumer_count: usize,
+    pub enqueue_count: usize,
+    pub dequeue_count: usize,
 }
 
 // Subscribers
