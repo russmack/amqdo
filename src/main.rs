@@ -169,8 +169,6 @@ fn api_get_heap_memory_usage(settings: &config::Config) {
 
 // TODO implement the following endpoint requests
 /*
-http://localhost:8161/admin/xml/topics.jsp
-http://localhost:8161/admin/xml/subscribers.jsp
 http://localhost:8161/admin/queueBrowse/RTestQ?view=rss&feedType=rss_2.0
 http://localhost:8161/admin/queueBrowse/RTestQ?view=rss&feedType=atom_1.0
 http://localhost:8161/admin/queueBrowse/RTestQ
@@ -250,15 +248,12 @@ fn main() {
     settings.merge(config::File::with_name("Settings")).unwrap();
 
     api_get_broker(&settings);
-
     api_get_version(&settings);
-
     api_get_heap_memory_usage(&settings);
 
     api_get_queues(&settings);
     api_get_topics(&settings);
     api_get_subscribers(&settings);
-
 }
 
 // Queues
@@ -310,7 +305,28 @@ pub struct TopicsTopicStats {
 // Subscribers
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubscribersResponse {
-    //
+    #[serde(rename="subscriber", default)]
+    pub subscribers: Vec<SubscribersSubscriber>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct SubscribersSubscriber {
+    pub client_id: String,
+    pub subscription_name: String,
+    pub connection_id: String,
+    pub destination_name: String,
+    pub selector: String,
+    pub active: String,
+    pub stats: SubscribersSubscriberStats,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct SubscribersSubscriberStats {
+    pub pending_queue_size: usize,
+    pub dispatched_queue_size: usize,
+    pub dispatched_counter: usize,
+    pub enqueue_counter: usize,
+    pub dequeue_counter: usize,
 }
 
 // API Version
