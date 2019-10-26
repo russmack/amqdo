@@ -17,6 +17,7 @@ pub enum ResponseType {
     Queues          { response: Option<QueuesResponse> },
     Topics          { response: Option<TopicsResponse> },
     Subscribers     { response: Option<SubscribersResponse> },
+    QueueBrowse     { response: Option<QueueBrowseResponse> },
 }
 
 fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Result<ResponseType, String> {
@@ -71,7 +72,6 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
             Ok(ResponseType::Queues { response: Some(res) })
         },
         ResponseType::Topics{response: _} => {
-            // TODO xml deserialization.
             let res: TopicsResponse = match serde_xml_rs::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
@@ -82,7 +82,6 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
             Ok(ResponseType::Topics { response: Some(res) })
         },
         ResponseType::Subscribers{response: _} => {
-            // TODO xml deserialization.
             let res: SubscribersResponse = match serde_xml_rs::from_str(&buf) {
                 Ok(v) => v,
                 Err(e) => {
@@ -91,6 +90,16 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
                 },
             };
             Ok(ResponseType::Subscribers { response: Some(res) })
+        },
+        ResponseType::QueueBrowse{response: _} => {
+            let res: QueueBrowseResponse = match serde_xml_rs::from_str(&buf) {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("failed deserializing queue browse xml response: {}", e);
+                    process::exit(1);
+                },
+            };
+            Ok(ResponseType::QueueBrowse{ response: Some(res) })
         },
     }
 }
@@ -171,7 +180,6 @@ fn api_get_heap_memory_usage(settings: &config::Config) {
 /*
 http://localhost:8161/admin/queueBrowse/RTestQ?view=rss&feedType=rss_2.0
 http://localhost:8161/admin/queueBrowse/RTestQ?view=rss&feedType=atom_1.0
-http://localhost:8161/admin/queueBrowse/RTestQ
 */
 
 fn api_get_queues(settings: &config::Config) {
@@ -243,6 +251,31 @@ fn api_get_subscribers(settings: &config::Config) {
     println!("{:#?}", result);
 }
 
+fn api_get_queue_browse(settings: &config::Config) {
+    // TODO: the url requires user input/link for queue name.
+    let queue_name = "RTestQ";
+    // Queues
+    // Eg. http://localhost:8161/admin/queueBrowse/TestQ
+    let req = format!("http://{}:{}/{}/{}/{}",
+                settings.get::<String>("hostname").unwrap(),
+                settings.get::<String>("brokerport").unwrap(),
+                "admin",
+                "queueBrowse",
+                queue_name,
+                );
+
+    let result = match send_request(ResponseType::QueueBrowse{response: None}, req, &settings) {
+        Ok(v)   => v,
+        Err(e)  => {
+            println!("error: request failed: {}", e);
+            process::exit(1);
+        },
+    };
+
+    println!("Result queue browse messages:");
+    println!("{:#?}", result);
+}
+
 fn main() {
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
@@ -254,6 +287,8 @@ fn main() {
     api_get_queues(&settings);
     api_get_topics(&settings);
     api_get_subscribers(&settings);
+    
+    api_get_queue_browse(&settings);
 }
 
 // Queues
@@ -361,6 +396,17 @@ struct VersionValueInfo {
     product: String,
     vendor: String,
     version: String,
+}
+
+// Queue Browse
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueueBrowseResponse {
+    #[serde(rename="message", default)]
+    messages: Vec<QueueBrowseMessagesMessage>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueueBrowseMessagesMessage {
+    id: String,
 }
 
 // Heap Memory Usage
