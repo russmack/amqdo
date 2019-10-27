@@ -18,6 +18,7 @@ pub enum ResponseType {
     Topics          { response: Option<TopicsResponse> },
     Subscribers     { response: Option<SubscribersResponse> },
     QueueBrowse     { response: Option<QueueBrowseResponse> },
+    QueueFeedAtom   { response: Option<QueueFeedAtomResponse> },
 }
 
 fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Result<ResponseType, String> {
@@ -100,6 +101,16 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
                 },
             };
             Ok(ResponseType::QueueBrowse{ response: Some(res) })
+        },
+        ResponseType::QueueFeedAtom{response: _} => {
+            let res: QueueFeedAtomResponse = match serde_xml_rs::from_str(&buf) {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("failed deserializing queue feed atom xml response: {}", e);
+                    process::exit(1);
+                },
+            };
+            Ok(ResponseType::QueueFeedAtom{ response: Some(res) })
         },
     }
 }
@@ -276,6 +287,32 @@ fn api_get_queue_browse(settings: &config::Config) {
     println!("{:#?}", result);
 }
 
+fn api_get_queue_as_atom(settings: &config::Config) {
+    // TODO: the url requires user input/link for queue name.
+    let queue_name = "RTestQ";
+    // Messages as atom feed.
+    // Eg. http://localhost:8161/admin/queueBrowse/RTestQ?view=rss&feedType=atom_1.0
+    let req = format!("http://{}:{}/{}/{}/{}?view=rss&feedType=atom_1.0",
+                settings.get::<String>("hostname").unwrap(),
+                settings.get::<String>("brokerport").unwrap(),
+                "admin",
+                "queueBrowse",
+                queue_name,
+                );
+
+    let result = match send_request(ResponseType::QueueFeedAtom{response: None}, req, &settings) {
+        Ok(v)   => v,
+        Err(e)  => {
+            println!("error: request failed: {}", e);
+            process::exit(1);
+        },
+    };
+
+    println!("Result queue atom messages:");
+    println!("{:#?}", result);
+}
+
+
 fn main() {
     let mut settings = config::Config::default();
     settings.merge(config::File::with_name("Settings")).unwrap();
@@ -289,6 +326,7 @@ fn main() {
     api_get_subscribers(&settings);
     
     api_get_queue_browse(&settings);
+    api_get_queue_as_atom(&settings);
 }
 
 // Queues
@@ -407,6 +445,42 @@ pub struct QueueBrowseResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueueBrowseMessagesMessage {
     id: String,
+}
+
+// Queue Browse
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueueFeedAtomResponse {
+    #[serde(rename="entry", default)]
+    feed: Vec<QueueFeedAtomEntriesEntry>,
+    title: String,
+    link: QueueFeedAtomEntriesEntryLink,
+    subtitle: String,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueueFeedAtomEntriesEntry {
+    title: String,
+    link: QueueFeedAtomEntriesEntryLink,
+    author: QueueFeedAtomEntriesEntryAuthor,
+    updated: String,
+    published: String, 
+    summary: QueueFeedAtomEntriesEntrySummary,
+    date: String,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueueFeedAtomEntriesEntryLink {
+    rel: String,
+    href: String,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueueFeedAtomEntriesEntryAuthor {
+    name: String,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueueFeedAtomEntriesEntrySummary {
+    #[serde(rename="type")]
+    summary_type: String,
+    #[serde(rename="$value")]
+    value: String,
 }
 
 // Heap Memory Usage
