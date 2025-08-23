@@ -1,8 +1,8 @@
 [package]
+edition = "2024"
 name = "amqdo"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["russell"]
-edition = "2018"
 
 [dependencies]
 config = "0.9.3"
