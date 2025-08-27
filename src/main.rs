@@ -1,12 +1,7 @@
-extern crate config;
-extern crate reqwest;
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
-extern crate serde_xml_rs;
-
 use std::process;
 
+use config::{Config, File};
+use reqwest::blocking::Client;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug)]
@@ -27,11 +22,26 @@ fn send_request(t: ResponseType, req: String, settings: &config::Config) -> Resu
     let user = settings.get::<String>("username").unwrap();
     let pass = settings.get::<String>("password").unwrap();
 
-    let client = reqwest::Client::new();
-    let mut resp = client.get(req.as_str()).basic_auth(&user, Some(&pass)).send().unwrap();
-
-    let buf = resp.text().unwrap();
+    let client = Client::new();
+    let resp = client
+        .get(req.as_str())
+        .basic_auth(&user, Some(&pass))
+        .send();
     
+    let buf = match resp {
+        Ok(response) => match response.text() {
+            Ok(buf) => buf,
+            Err(e) => {
+                eprintln!("Error reading text: {}", e);
+                process::exit(1);
+            }
+        },
+        Err(e) => {
+            eprintln!("Error sending request: {}", e);
+            process::exit(1);
+        }
+    };
+
     match t {
         ResponseType::Broker {response: _} => {
             let res: BrokerResponse = match serde_json::from_str(&buf) {
@@ -342,10 +352,12 @@ fn api_get_queue_as_rss(settings: &config::Config) {
     println!("{:#?}", result);
 }
 
-
 fn main() {
-    let mut settings = config::Config::default();
-    settings.merge(config::File::with_name("Settings")).unwrap();
+    let settings = Config::builder()
+    .add_source(File::with_name("Settings"))
+    .build()
+    .unwrap();
+
 
     api_get_broker(&settings);
     api_get_version(&settings);
